@@ -25,7 +25,7 @@ class Index(RedirectView):
     def get_redirect_url(self, *args, **kwargs):
         user = self.request.user.is_authenticated()
         if user:
-            if user.is_superuser:
+            if self.request.user.is_superuser:
                 url = '/super-admin'
             else:
                 url = '/employee/'+str(self.request.user.id)

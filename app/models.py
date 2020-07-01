@@ -5,26 +5,7 @@ from django.db import models
 
 # Create your models here.
 
-'''
-LeaveApplication
 
-no of days
-start date 
-end date
-emaployee name (Fk)
-description
-status
-
-Employee
-
-name
-no of leaves taken
-remaining leave
-
-Leave
-
-total no of leave
-'''
 
 
 class Leave(models.Model):
