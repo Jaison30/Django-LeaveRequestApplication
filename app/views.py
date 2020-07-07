@@ -1,16 +1,30 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from django.shortcuts import render
-from django.views.generic import TemplateView, FormView, RedirectView
+from django.views.generic import (
+    TemplateView, 
+    FormView, 
+    RedirectView
+    )
 from django.http import HttpResponseRedirect
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.models import User , Group
-from django.contrib.auth import login as auth_login, logout as auth_logout, authenticate
+from django.contrib.auth.models import (
+    User, 
+    Group
+    ) 
+from django.contrib.auth import (
+    login as auth_login, 
+    logout as auth_logout, 
+    authenticate
+    )
 from django.contrib import messages
 from random import randint
-
-from datetime import date, timedelta, datetime
+from datetime import (
+    date, 
+    timedelta, 
+    datetime
+    ) 
 import calendar
 
 from .models import *
@@ -33,7 +47,10 @@ class Index(RedirectView):
             url = '/login'
         return url
 
-# Authentication views 
+
+""" Authentication views """
+
+
 class Login(FormView):
 
     form_class = AuthenticationForm
@@ -89,12 +106,11 @@ class RegisterView(FormView):
             email = data.get('email', '')
             password = data.get('password', '')
 
-
             if User.objects.filter(username=username).exists():
                 messages.error(self.request, "The Username already Exist")
                 return HttpResponseRedirect('/register')
             if User.objects.filter(email=email).exists():
-                messages.error(self.request,"This email is already exist!")
+                messages.error(self.request, "This email is already exist!")
                 return HttpResponseRedirect('/register')
             user = User.objects.create(
                 username=username,
@@ -114,8 +130,8 @@ class RegisterView(FormView):
 
             return HttpResponseRedirect('/')
         except Exception as e:
-            messages.error(self.request,"The registration has been failed. Please try again!")
-            return HttpResponseRedirect('/register')
+            messages.error(self.request, "The registration has been failed. Please try again!")
+        return HttpResponseRedirect('/register')
 
 
 class LogoutView(RedirectView):
@@ -126,10 +142,13 @@ class LogoutView(RedirectView):
         auth_logout(request)
         return super(LogoutView, self).get(request, *args, **kwargs)
 
-# Authentication views End
+
+""" Authentication Views End"""
 
 
-# Employee's Views 
+""" Employee's Views """
+
+
 class Home(LoginRequiredMixin, TemplateView):
 
     """
@@ -143,13 +162,20 @@ class Home(LoginRequiredMixin, TemplateView):
         ctx = super(Home, self).get_context_data(**kwargs)
         user = User.objects.get(pk=self.kwargs.get('pk'))
         employee = EmployeeDetails.objects.get(name=user.username)
-        leaves = LeaveApplication.objects.filter(employee=employee.id).order_by('date')
+        leaves = LeaveApplication.objects.filter(
+            employee=employee.id).order_by('-date')
 
         # check if the employee exeeds the leave limit
         if employee.no_of_remaining_leaves == 0:
-            ctx['leave_closed'] = True
+            ctx['application_closed'] = True
+            ctx['message'] = 'Your maximum leave is completed'
         else:
-            ctx['leave_closed'] = False
+            ctx['application_closed'] = False
+        print 'Leaves', employee.no_of_applied_leaves
+
+        if employee.no_of_applied_leaves >= 18:
+            ctx['application_closed'] = True
+            ctx['message'] = 'Your maximum leave to be apply is completed'
 
         ctx['employee_name'] = employee.name
         ctx['no_of_leaves'] = employee.no_of_leaves
@@ -158,7 +184,13 @@ class Home(LoginRequiredMixin, TemplateView):
         ctx['leaves_list'] = []
 
         for leave in leaves:
+            print 'status', leave.status
             data = {}
+            if leave.status == 'Not Approved':
+                data['show_delete_button'] = True
+            elif leave.status == 'Approved':
+                data['show_delete_button'] = False
+            data['id'] = leave.id
             data['leave_type'] = leave.leave_type
             data['date'] = leave.date
             data['duration'] = leave.duration
@@ -171,9 +203,9 @@ class Home(LoginRequiredMixin, TemplateView):
 
         return ctx
 
-class ApplyLeave(FormView):
- 
 
+class ApplyLeave(FormView):
+    """ View for apply leave """
     def post(self, request):
         
         levae_type = self.request.POST.get('levae_type')
@@ -185,10 +217,8 @@ class ApplyLeave(FormView):
 
         employee = EmployeeDetails.objects.get(name=request.user)
 
-
         if len(start_date) > 0:
 
-            
             date1 = datetime.strptime(start_date, '%m/%d/%Y')
             date2 = datetime.strptime(end_date, '%m/%d/%Y')
 
@@ -199,16 +229,25 @@ class ApplyLeave(FormView):
 
                 leave = LeaveApplication()
 
-                week_day = calendar.day_name[datetime.strptime(str(days), '%Y-%m-%d %H:%M:%S').weekday()] 
+                week_day = calendar.day_name[
+                    datetime.strptime(
+                        str(days), '%Y-%m-%d %H:%M:%S'
+                        ).weekday()] 
 
                 if week_day != 'Saturday' and week_day != 'Sunday':
-                    leave.date = datetime.strptime(str(days), '%Y-%m-%d %H:%M:%S')
-                    leave.leave_type = levae_type
-                    leave.duration = 'Full Day'
-                    leave.employee = employee
-                    leave.description = reason
 
-                    leave.save()
+                    if int(employee.no_of_applied_leaves) <= 17:
+
+                        employee.no_of_applied_leaves = float(employee.no_of_applied_leaves) + 1
+                        employee.save()
+
+                        leave.date = datetime.strptime(str(days), '%Y-%m-%d %H:%M:%S')
+                        leave.leave_type = levae_type
+                        leave.duration = 'Full Day'
+                        leave.employee = employee
+                        leave.description = reason
+
+                        leave.save()
 
         elif len(start_date) == 0:
             leave = LeaveApplication()
@@ -219,20 +258,58 @@ class ApplyLeave(FormView):
 
             if week_day != 'Saturday' and week_day != 'Sunday':
 
-                leave.date = date
-                leave.leave_type = levae_type
-                leave.duration = duration
-                leave.employee = employee
-                leave.description = reason
+                if int(employee.no_of_applied_leaves) <= 17:
 
-                leave.save()
+                    if duration == 'Full Day':
+                        employee.no_of_applied_leaves = float(employee.no_of_applied_leaves) + 1
+                    elif duration == 'Half Day':
+                        employee.no_of_applied_leaves = float(employee.no_of_applied_leaves) + 0.5
+                    employee.save()
 
+                    leave.date = date
+                    leave.leave_type = levae_type
+                    leave.duration = duration
+                    leave.employee = employee
+                    leave.description = reason
+
+                    leave.save()
 
         return HttpResponseRedirect('/employee/'+str(request.user.id))
 
-# Employee's Views End
 
-# Super Admin Views 
+class DeleteLeaveApplication(LoginRequiredMixin, RedirectView):
+    """ To delete appllied leaves """
+    login_url = '/login/'
+
+    def get_redirect_url(self, *args, **kwargs):
+
+        user_id = self.request.user.id
+        username = self.request.user.username
+
+        url = '/employee/' + str(user_id)  # Redirect url
+
+        id = kwargs['pk']  # Leave id
+        
+        employee = EmployeeDetails.objects.get(name=username)
+        leave = LeaveApplication.objects.get(id=id)
+
+        duration = leave.duration
+        
+        if duration == 'Half Day':
+                employee.no_of_applied_leaves = float(employee.no_of_applied_leaves) - 0.5
+        if duration == 'Full Day':
+                employee.no_of_applied_leaves = float(employee.no_of_applied_leaves) - 1
+
+        employee.save()
+        leave.delete()  # Delete leave application
+        
+        return url
+
+
+""" Employee's Views End """
+
+""" Super Admin Views """ 
+
 
 class SuperAdmin(LoginRequiredMixin, TemplateView):
 
@@ -247,7 +324,7 @@ class SuperAdmin(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super(SuperAdmin, self).get_context_data(**kwargs)
 
-        leaves = LeaveApplication.objects.all()
+        leaves = LeaveApplication.objects.all().order_by('-date')
    
         ctx['username'] = self.request.user
         ctx['leaves'] = leaves
@@ -256,9 +333,11 @@ class SuperAdmin(LoginRequiredMixin, TemplateView):
         return ctx
 
 
-class SaveLeaveStatus(RedirectView):
-
+class SaveLeaveStatus(LoginRequiredMixin, RedirectView):
+    """ View to approve leaves """
+    login_url = '/login/'
     url = '/super-admin'
+
     def get_redirect_url(self, *args, **kwargs):
         
         id = kwargs['pk']
@@ -289,3 +368,8 @@ class SaveLeaveStatus(RedirectView):
                     employee.no_of_remaining_leaves = float(employee.no_of_remaining_leaves) + 1
         employee.save()
         return super(SaveLeaveStatus, self).get_redirect_url(*args, **kwargs)
+
+
+
+
+

@@ -19,6 +19,7 @@ class EmployeeDetails(models.Model):
 	name = models.CharField(max_length=100, blank=True, null=True, unique=True)
 	no_of_leaves = models.FloatField( default=0)
 	no_of_remaining_leaves = models.FloatField( default=18)
+	no_of_applied_leaves = models.FloatField( default=0)
 	total_no_of_leaves = models.FloatField(default=18)
 
 	def __str__(self):

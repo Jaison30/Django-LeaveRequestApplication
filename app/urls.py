@@ -28,6 +28,7 @@ urlpatterns = [
     url(r'^apply-leave/$', ApplyLeave.as_view(), name='apply-leave'),
     url(r'^super-admin/$', SuperAdmin.as_view(), name='super-admin'),
     url(r'^save-leave-status/(?P<pk>\d+)/$', SaveLeaveStatus.as_view(), name='save leave status'),
+    url(r'^delete-leave-application/(?P<pk>\d+)/$', DeleteLeaveApplication.as_view(), name='delete leave application'),
 
     
     
